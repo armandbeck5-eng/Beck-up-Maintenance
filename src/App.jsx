@@ -27,7 +27,10 @@ const supabase =
 // ─────────────────────────────────────────────────────────────────────────────
 // LOGO  (base64 embedded so it works without a server)
 // ─────────────────────────────────────────────────────────────────────────────
-const LOGO_URL = "/logo.png"; // place logo.png in /public folder
+const LOGO_URL = "https://raw.githubusercontent.com/armandbeck5-eng/Beck-up-Maintenance/main/logo.png";
+
+// ADMIN PASSWORD — change this to whatever you want
+const ADMIN_PASSWORD = "BeckUp2024!";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA
@@ -494,6 +497,53 @@ function ReportPage() {
   return <IssueList onSelect={select} />;
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN LOGIN SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
+function AdminLogin({ onLogin }) {
+  const [pw, setPw]     = useState("");
+  const [err, setErr]   = useState("");
+  const [show, setShow] = useState(false);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (pw === ADMIN_PASSWORD) {
+      sessionStorage.setItem("beckup_admin", "1");
+      onLogin();
+    } else {
+      setErr("Incorrect password. Please try again.");
+      setPw("");
+    }
+  };
+
+  return (
+    <div className="page fade" style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"70vh" }}>
+      <div style={{ width:"100%", maxWidth:380 }}>
+        <div style={{ textAlign:"center", marginBottom:32 }}>
+          <img src={LOGO_URL} alt="Beck-Up" style={{ width:72, height:72, objectFit:"contain", marginBottom:16, filter:"drop-shadow(0 0 12px rgba(212,175,55,.3))" }} onError={e=>e.target.style.display="none"} />
+          <div style={{ fontFamily:"var(--ff-display)", fontSize:28, fontWeight:600, color:"var(--text)", marginBottom:6 }}>Admin Access</div>
+          <div style={{ fontSize:12, color:"var(--muted)", fontWeight:300 }}>Beck-Up Maintenance Dashboard</div>
+        </div>
+        <div className="form-card">
+          <form onSubmit={handleLogin}>
+            <div className="fg" style={{ marginBottom:16 }}>
+              <label className="flabel">Password</label>
+              <div style={{ position:"relative" }}>
+                <input className="finput" type={show ? "text" : "password"} placeholder="Enter admin password" value={pw} onChange={e => { setPw(e.target.value); setErr(""); }} required autoFocus style={{ paddingRight:44 }} />
+                <button type="button" onClick={() => setShow(s => !s)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"var(--muted)", cursor:"pointer", fontSize:14 }}>{show ? "🙈" : "👁"}</button>
+              </div>
+            </div>
+            {err && <div style={{ color:"#f87171", fontSize:12, marginBottom:12 }}>⚠ {err}</div>}
+            <button type="submit" className="submit-btn">Enter Dashboard</button>
+          </form>
+        </div>
+        <div style={{ textAlign:"center", marginTop:20, fontSize:11, color:"var(--muted)" }}>Only authorised Beck Estates staff may access this area.</div>
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -649,12 +699,50 @@ function AdminPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
   const [view, setView] = useState("report");
+  const [adminAuth, setAdminAuth] = useState(
+    () => sessionStorage.getItem("beckup_admin") === "1"
+  );
+
+  const handleAdminNav = () => setView("admin");
+  const handleLogout = () => {
+    sessionStorage.removeItem("beckup_admin");
+    setAdminAuth(false);
+    setView("report");
+  };
+
   return (
     <>
       <style>{css}</style>
       <div className="app">
-        <Nav view={view} setView={setView} />
-        {view === "report" ? <ReportPage /> : <AdminPage />}
+        <nav className="nav">
+          <div className="nav-brand">
+            <img src={LOGO_URL} alt="Beck-Up" className="nav-logo-img" onError={e => e.target.style.display="none"} />
+            <div className="nav-brand-text">
+              <span className="nav-brand-top">Beck-Up</span>
+              <span className="nav-brand-sub">Maintenance</span>
+            </div>
+          </div>
+          <div className="nav-tabs">
+            <button className={`nav-tab ${view === "report" ? "active" : ""}`} onClick={() => setView("report")}>
+              Report a Problem
+            </button>
+            <button className={`nav-tab ${view === "admin" ? "active" : ""}`} onClick={handleAdminNav}>
+              Admin
+            </button>
+            {adminAuth && view === "admin" && (
+              <button className="nav-tab" onClick={handleLogout} style={{ color:"var(--gold-d)" }}>
+                Log Out
+              </button>
+            )}
+          </div>
+        </nav>
+        {view === "report" ? (
+          <ReportPage />
+        ) : adminAuth ? (
+          <AdminPage />
+        ) : (
+          <AdminLogin onLogin={() => setAdminAuth(true)} />
+        )}
       </div>
     </>
   );
