@@ -372,7 +372,21 @@ function RequestForm({ category, issue, onBack }) {
   const [busy, setBusy]     = useState(false);
   const [done, setDone]     = useState(false);
   const [err,  setErr]      = useState("");
+  const [photos, setPhotos] = useState([]); // base64 strings
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+  const handlePhotoAdd = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      if (file.size > 5 * 1024 * 1024) { setErr("Each photo must be under 5MB."); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => setPhotos(prev => [...prev, { url: ev.target.result, name: file.name }]);
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const removePhoto = (i) => setPhotos(prev => prev.filter((_, idx) => idx !== i));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -387,6 +401,7 @@ function RequestForm({ category, issue, onBack }) {
       reporter_phone:   f.reporter_phone  || null,
       property_address: f.property_address,
       unit_number:      f.unit_number     || null,
+      photo_count:      photos.length,
       status:           "pending",
     };
 
@@ -466,6 +481,30 @@ function RequestForm({ category, issue, onBack }) {
               <label className="flabel">Description *</label>
               <textarea className="ftextarea" placeholder="Describe the problem in detail — when did it start, how severe is it?" value={f.description} onChange={e=>set("description",e.target.value)} required />
             </div>
+          </div>
+
+          {/* PHOTO UPLOAD */}
+          <div style={{ marginTop:8, marginBottom:4 }}>
+            <label className="flabel" style={{ display:"block", marginBottom:8 }}>Photos <span style={{color:"var(--muted)",fontWeight:300,textTransform:"none",letterSpacing:0}}>(optional — up to 5)</span></label>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:8 }}>
+              {photos.map((p,i) => (
+                <div key={i} style={{ position:"relative", width:72, height:72 }}>
+                  <img src={p.url} alt="" style={{ width:72, height:72, objectFit:"cover", border:"1px solid var(--border)" }} />
+                  <button type="button" onClick={() => removePhoto(i)}
+                    style={{ position:"absolute", top:-6, right:-6, width:18, height:18, borderRadius:"50%", background:"#f87171", border:"none", color:"#fff", fontSize:10, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700 }}>✕</button>
+                </div>
+              ))}
+              {photos.length < 5 && (
+                <label style={{ width:72, height:72, border:"1px dashed var(--border)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", cursor:"pointer", background:"var(--s2)", transition:"border-color .18s" }}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor="var(--gold-d)"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor="var(--border)"}>
+                  <span style={{ fontSize:22, color:"var(--muted)" }}>📷</span>
+                  <span style={{ fontSize:9, color:"var(--muted)", marginTop:3, letterSpacing:"0.05em" }}>ADD</span>
+                  <input type="file" accept="image/*" multiple style={{ display:"none" }} onChange={handlePhotoAdd} />
+                </label>
+              )}
+            </div>
+            <div style={{ fontSize:10, color:"var(--muted)" }}>JPG, PNG or WEBP · Max 5MB each · Up to 5 photos</div>
           </div>
 
           {err && <div style={{ color:"#f87171", fontSize:12, marginTop:10 }}>⚠ {err}</div>}
@@ -624,7 +663,7 @@ function AdminPage() {
             <thead>
               <tr>
                 <th>Date</th><th>Category / Issue</th><th>Reporter</th>
-                <th>Property</th><th>Description</th><th>Status</th>
+                <th>Property</th><th>Description</th><th>Photos</th><th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -647,6 +686,11 @@ function AdminPage() {
                       <div style={{color:"var(--muted)",fontSize:11,lineHeight:1.5}}>
                         {req.description?.slice(0,90)}{req.description?.length>90?"…":""}
                       </div>
+                    </td>
+                    <td style={{textAlign:"center"}}>
+                      {req.photo_count > 0
+                        ? <span style={{color:"var(--gold)",fontSize:12}}>📷 {req.photo_count}</span>
+                        : <span style={{color:"var(--border)",fontSize:11}}>—</span>}
                     </td>
                     <td>
                       <select
