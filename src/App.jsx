@@ -25,6 +25,30 @@ const supabase =
     : null;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PHOTO UPLOAD — stores photos in Supabase Storage bucket "maintenance-photos"
+// ─────────────────────────────────────────────────────────────────────────────
+async function uploadPhotos(photos, requestId) {
+  if (!supabase || !photos.length) return [];
+  const urls = [];
+  for (let i = 0; i < photos.length; i++) {
+    const photo = photos[i];
+    // Convert base64 to blob
+    const res  = await fetch(photo.url);
+    const blob = await res.blob();
+    const ext  = photo.name.split(".").pop() || "jpg";
+    const path = `${requestId}/${i + 1}.${ext}`;
+    const { error } = await supabase.storage
+      .from("maintenance-photos")
+      .upload(path, blob, { contentType: blob.type, upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from("maintenance-photos").getPublicUrl(path);
+      urls.push(data.publicUrl);
+    }
+  }
+  return urls;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LOGO  (base64 embedded so it works without a server)
 // ─────────────────────────────────────────────────────────────────────────────
 const LOGO_URL = "https://raw.githubusercontent.com/armandbeck5-eng/Beck-up-Maintenance/main/logo.png";
@@ -43,7 +67,7 @@ const CATEGORIES = [
   { id: 5, name: "Garden & Exterior",icon: "🌿", issues: ["Garden irrigation fault","Boundary wall damaged","Gate motor fault","Outdoor lighting fault","Pool pump fault","Paving damaged"] },
   { id: 6, name: "Plumbing",         icon: "💧", issues: ["Burst pipe","Leaking tap","Blocked drain","Toilet not flushing","No hot water","Low water pressure","Geyser leaking"] },
   { id: 7, name: "Security",         icon: "🔒", issues: ["Alarm fault","CCTV not working","Access control broken","Safe not opening","Security gate damaged"] },
-  { id: 8, name: "Structure & Interior", icon: "🏠", issues: ["Ceiling leak","Roof damage","Wall crack","Floor tile cracked","Paint peeling","Cupboard damaged","Gutter blocked"] },
+  { id: 8, name: "Structure & Interior", icon: "🏠", issues: ["Ceiling leak","Roof damage","Wall crack","Paint peeling","Cupboard damaged","Gutter blocked"] },
 ];
 
 const STATUS_META = {
@@ -61,6 +85,12 @@ async function dbInsert(req) {
   const { data, error } = await supabase.from("maintenance_requests").insert([req]).select().single();
   if (error) console.error("Supabase insert error:", error);
   return data;
+}
+async function dbUpdatePhotos(id, photoUrls) {
+  if (!supabase) return;
+  await supabase.from("maintenance_requests")
+    .update({ photo_urls: photoUrls, photo_count: photoUrls.length })
+    .eq("id", id);
 }
 async function dbList() {
   if (!supabase) return [];
@@ -405,21 +435,31 @@ function RequestForm({ category, issue, onBack }) {
       status:           "pending",
     };
 
-    // 1. Send email via Formspree
+    // 1. Send email via Formspree (photos attached as note — actual urls added after upload)
     const emailOk = await submitToFormspree({
       ...payload,
       _subject: `New Maintenance Request — ${resolvedIssue} (${category})`,
       _replyto: f.reporter_email,
+      photos: photos.length > 0 ? `${photos.length} photo(s) attached — view in admin dashboard` : "No photos",
     });
     if (!emailOk) { setErr("Email send failed — please try again."); setBusy(false); return; }
 
     // 2. Save to Supabase (or localStorage fallback)
+    let savedRecord = null;
     if (supabase) {
-      await dbInsert({ ...payload, created_at: new Date().toISOString() });
+      savedRecord = await dbInsert({ ...payload, created_at: new Date().toISOString() });
     } else {
       const all = lsGet();
-      all.unshift({ ...payload, id: Date.now(), created_at: new Date().toISOString() });
+      const localRec = { ...payload, id: Date.now(), created_at: new Date().toISOString() };
+      all.unshift(localRec);
       lsSave(all);
+      savedRecord = localRec;
+    }
+
+    // 3. Upload photos and link them to the record
+    if (photos.length > 0 && savedRecord?.id) {
+      const photoUrls = await uploadPhotos(photos, savedRecord.id);
+      await dbUpdatePhotos(savedRecord.id, photoUrls);
     }
 
     setBusy(false); setDone(true);
@@ -687,10 +727,18 @@ function AdminPage() {
                         {req.description?.slice(0,90)}{req.description?.length>90?"…":""}
                       </div>
                     </td>
-                    <td style={{textAlign:"center"}}>
-                      {req.photo_count > 0
-                        ? <span style={{color:"var(--gold)",fontSize:12}}>📷 {req.photo_count}</span>
-                        : <span style={{color:"var(--border)",fontSize:11}}>—</span>}
+                    <td>
+                      {req.photo_urls?.length > 0 ? (
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                          {req.photo_urls.map((url,pi) => (
+                            <a key={pi} href={url} target="_blank" rel="noreferrer">
+                              <img src={url} alt="" style={{width:40,height:40,objectFit:"cover",border:"1px solid var(--border)",display:"block"}} />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{color:"var(--border)",fontSize:11}}>—</span>
+                      )}
                     </td>
                     <td>
                       <select
