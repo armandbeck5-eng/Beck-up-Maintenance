@@ -67,7 +67,7 @@ const CATEGORIES = [
   { id: 5, name: "Garden & Exterior",icon: "🌿", issues: ["Garden irrigation fault","Boundary wall damaged","Gate motor fault","Outdoor lighting fault","Pool pump fault","Paving damaged"] },
   { id: 6, name: "Plumbing",         icon: "💧", issues: ["Burst pipe","Leaking tap","Blocked drain","Toilet not flushing","No hot water","Low water pressure","Geyser leaking"] },
   { id: 7, name: "Security",         icon: "🔒", issues: ["Alarm fault","CCTV not working","Access control broken","Safe not opening","Security gate damaged"] },
-  { id: 8, name: "Structure & Interior", icon: "🏠", issues: ["Ceiling leak","Roof damage","Wall crack","Paint peeling","Cupboard damaged","Gutter blocked"] },
+  { id: 8, name: "Structure & Interior", icon: "🏠", issues: ["Ceiling leak","Roof damage","Cupboard damaged","Gutter blocked"] },
 ];
 
 const STATUS_META = {
